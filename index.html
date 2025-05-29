@@ -1083,57 +1083,27 @@
           >
         </div>
       </div>
-      <form class="footer__form flex" method="POST" id="form" action="">
-        <input
-            class="input"
-            type="text"
-            name="ФИО"
-            id="fio"
-            placeholder="Ваше имя"
-            required
-        />
-        <input
-            class="input"
-            type="tel"
-            name="phone"
-            id="tel"
-            placeholder="Телефон"
-            required
-        />
-        <input
-            class="input"
-            type="email"
-            name="email"
-            id="email"
-            placeholder="E-mail"
-            required
-        />
-        <textarea style="resize: none;"
-                  class="form__textarea"
-                  name="comment"
-                  id="comm"
-                  placeholder="Ваш комментарий"
-        ></textarea>
-        <label class="form__check">
-          <input class="label__input" type="checkbox" required/>
-          Отправляя заявку, я&nbsp;даю согласие на
-          <a href="#">обработку своих персональных данных.*</a>
-        </label>
-        <div
-            class="g-recaptcha"
-            data-sitekey="6Lec858qAAAAAEjxYiEY-OFAK5aBoaTGhxY9zOYs"
-        ></div>
-        <button class="footer__btn btn__reset" type="submit">
-          СВЯЖИТЕСЬ С НАМИ
-        </button>
-        <div id="success-message" style="display:none; color: green;">Спасибо за вашу заявку! Мы
-          свяжемся с вами в ближайшее время.
-        </div>
-        <div id="error-message" style="display:none; color: red;">Произошла ошибка при отправке
-          формы. Пожалуйста, попробуйте снова.
-        </div>
-
-      </form>
+     <form class="footer__form flex" method="POST" id="form" action="/api/submit" data-js="true">
+  <input class="input" type="text" name="ФИО" id="fio" placeholder="Ваше имя" required>
+  <input class="input" type="tel" name="phone" id="tel" placeholder="Телефон" required>
+  <input class="input" type="email" name="email" id="email" placeholder="E-mail" required>
+  <textarea style="resize: none;" class="form__textarea" name="comment" id="comm" placeholder="Ваш комментарий"></textarea>
+  <label class="form__check">
+    <input class="label__input" type="checkbox" required/>
+    Отправляя заявку, я даю согласие на
+    <a href="#">обработку своих персональных данных.*</a>
+  </label>
+  <div class="g-recaptcha" data-sitekey="6Lec858qAAAAAEjxYiEY-OFAK5aBoaTGhxY9zOYs"></div>
+  <button class="footer__btn btn__reset" type="submit">СВЯЖИТЕСЬ С НАМИ</button>
+  <div id="success-message" style="display:none; color: green;">Спасибо за вашу заявку! Мы свяжемся с вами в ближайшее время.</div>
+  <div id="error-message" style="display:none; color: red;">Произошла ошибка при отправке формы. Пожалуйста, попробуйте снова.</div>
+  
+  <noscript>
+    <style>.g-recaptcha { display: none !important; }</style>
+    <input type="submit" value="Отправить" style="display: block; width: 100%; padding: 10px; margin-top: 10px;">
+  </noscript>
+</form>
+      
     </div>
   </div>
   <img class="line" src="img/Vector 3.png" alt=""/>
@@ -1181,6 +1151,7 @@
   });
 
 </script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script type="module" defer src="js/main.js"></script>
 
 </html>
