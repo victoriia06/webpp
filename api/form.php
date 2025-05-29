@@ -1,54 +1,54 @@
 <?php
-function form_get($request) {
-  return array(
-    'headers' => array('Content-Type' => 'text/html'),
-    'entity' => file_get_contents('../index.html')
-  );
-}
-
 function form_post($request) {
-  $data = $request['post'];
-  $errors = [];
-  
-  if (empty($data['ФИО'])) $errors[] = 'Не указано имя';
-  if (empty($data['phone'])) $errors[] = 'Не указан телефон';
-  if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-    $errors[] = 'Некорректный email';
-  }
-
-  if (!empty($errors)) {
-    return json_response(['errors' => $errors], 400);
-  }
-
-  try {
-    db_command(
-      "INSERT INTO feedback (name, email, phone, message) VALUES (?, ?, ?, ?)",
-      $data['ФИО'], $data['email'], $data['phone'], $data['comment'] ?? ''
-    );
+    $data = json_decode(file_get_contents('php://input'), true);
     
-    $login = 'user_' . substr(md5($data['email']), 0, 8);
-    $password = substr(md5(uniqid()), 0, 8);
+    // Валидация
+    $errors = [];
+    if (empty($data['name'])) $errors[] = 'Name is required';
+    if (empty($data['email'])) $errors[] = 'Email is required';
+    if (empty($data['phone'])) $errors[] = 'Phone is required';
     
-    return json_response([
-      'success' => true,
-      'message' => 'Форма успешно отправлена',
-      'credentials' => [
-        'login' => $login,
-        'password' => $password,
-        'profile_url' => '/profile/' . urlencode($login)
-      ]
-    ]);
-  } catch (Exception $e) {
-    return json_response(['errors' => ['Ошибка базы данных']], 500);
-  }
-}
-
-function json_response($data, $status = 200) {
-  return [
-    'headers' => [
-      'Content-Type' => 'application/json',
-      'HTTP/1.1 ' . $status
-    ],
-    'entity' => json_encode($data)
-  ];
+    if (!empty($errors)) {
+        return ['errors' => $errors, 'status' => 400];
+    }
+    
+    try {
+        $pdo = DB::getConnection();
+        
+        // Если пользователь авторизован
+        if (!empty($request['user'])) {
+            $stmt = $pdo->prepare("INSERT INTO p_feedback (user_id, name, email, phone, message) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $request['user']['id'],
+                $data['name'],
+                $data['email'],
+                $data['phone'],
+                $data['message'] ?? null
+            ]);
+        } else {
+            // Анонимная отправка
+            $stmt = $pdo->prepare("INSERT INTO p_feedback (name, email, phone, message) VALUES (?, ?, ?, ?)");
+            $stmt->execute([
+                $data['name'],
+                $data['email'],
+                $data['phone'],
+                $data['message'] ?? null
+            ]);
+            
+            // Создаем временного пользователя
+            $login = 'user_' . bin2hex(random_bytes(4));
+            $password = bin2hex(random_bytes(4));
+            
+            return auth_register([
+                'login' => $login,
+                'password' => $password,
+                'email' => $data['email']
+            ]);
+        }
+        
+        return ['success' => true, 'status' => 200];
+        
+    } catch (PDOException $e) {
+        return ['error' => 'Database error', 'status' => 500];
+    }
 }
