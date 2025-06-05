@@ -5,6 +5,16 @@ try {
     $db = new PDO("mysql:host=localhost;dbname=u70422", 'u70422', '4545635');
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+    // Проверяем существование языков
+    $validLanguages = $db->query("SELECT id FROM programming_languages")->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($_POST['plang'])) {
+        foreach ($_POST['plang'] as $lang_id) {
+            if (!in_array($lang_id, $validLanguages)) {
+                throw new Exception("Неверный ID языка программирования: $lang_id");
+            }
+        }
+    }
+
     $db->beginTransaction();
 
     // Создание пользователя
@@ -31,7 +41,7 @@ try {
         $_POST['bio']
     ]);
 
-    // Добавление языков
+    // Добавление языков (после проверки)
     if (!empty($_POST['plang'])) {
         $stmt = $db->prepare("INSERT INTO p_user_languages (user_id, language_id) VALUES (?, ?)");
         foreach ($_POST['plang'] as $lang_id) {
@@ -41,7 +51,6 @@ try {
 
     $db->commit();
 
-    // Возвращаем данные для отображения на клиенте
     echo json_encode([
         'success' => true,
         'login' => $login,
@@ -49,11 +58,11 @@ try {
         'message' => 'Регистрация успешна!'
     ]);
     
-} catch (PDOException $e) {
+} catch (Exception $e) {
     $db->rollBack();
     echo json_encode([
         'success' => false,
-        'message' => 'Ошибка базы данных: ' . $e->getMessage()
+        'message' => $e->getMessage()
     ]);
 }
 ?>
