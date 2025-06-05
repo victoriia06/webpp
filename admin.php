@@ -2,32 +2,15 @@
 session_start();
 
 // Проверяем, авторизован ли администратор
-if (empty($_SESSION['admin']) {
-    header('HTTP/1.1 403 Forbidden');
-    exit('Доступ запрещен');
-}
-
-// Остальной код админ-панели...
-/**
- * Задача 6. Реализовать вход администратора с использованием
- * HTTP-авторизации для просмотра и удаления результатов.
- **/
-
-// HTTP-аутентификация
-if (empty($_SERVER['PHP_AUTH_USER']) ||
-    empty($_SERVER['PHP_AUTH_PW']) ||
-    $_SERVER['PHP_AUTH_USER'] != 'admin' ||
-    md5($_SERVER['PHP_AUTH_PW']) != md5('123')) {
-  header('HTTP/1.1 401 Unauthorized');
-  header('WWW-Authenticate: Basic realm="Admin Area"');
-  echo '<h1>401 Требуется авторизация</h1>';
-  exit();
+if (empty($_SESSION['admin'])) {
+    header('Location: login.php');
+    exit();
 }
 
 // Подключение к базе данных
-$user = 'uXXXXX';
-$pass = 'YYYYYY';
-$dbname = 'uXXXXX';
+$user = 'u70422';
+$pass = '4545635';
+$dbname = 'u70422';
 
 try {
     $db = new PDO("mysql:host=localhost;dbname=$dbname", $user, $pass, [
@@ -38,28 +21,24 @@ try {
     // Обработка действий администратора
     if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (!empty($_POST['delete_id'])) {
-            // Полное удаление пользователя и всех связанных данных
             try {
                 $db->beginTransaction();
                 
-                // 1. Получаем ID заявки
-                $stmt = $db->prepare("SELECT application_id FROM users WHERE id = ?");
+                // 1. Удаляем связи с языками
+                $stmt = $db->prepare("DELETE FROM p_user_languages WHERE user_id = ?");
                 $stmt->execute([$_POST['delete_id']]);
-                $appId = $stmt->fetchColumn();
                 
-                if ($appId) {
-                    // 2. Удаляем языки программирования
-                    $stmt = $db->prepare("DELETE FROM application_languages WHERE application_id = ?");
-                    $stmt->execute([$appId]);
-                    
-                    // 3. Удаляем пользователя
-                    $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
-                    $stmt->execute([$_POST['delete_id']]);
-                    
-                    // 4. Удаляем заявку
-                    $stmt = $db->prepare("DELETE FROM applications WHERE id = ?");
-                    $stmt->execute([$appId]);
-                }
+                // 2. Удаляем профиль пользователя
+                $stmt = $db->prepare("DELETE FROM p_profiles WHERE user_id = ?");
+                $stmt->execute([$_POST['delete_id']]);
+                
+                // 3. Удаляем feedback пользователя
+                $stmt = $db->prepare("DELETE FROM p_feedback WHERE user_id = ?");
+                $stmt->execute([$_POST['delete_id']]);
+                
+                // 4. Удаляем самого пользователя
+                $stmt = $db->prepare("DELETE FROM p_users WHERE id = ?");
+                $stmt->execute([$_POST['delete_id']]);
                 
                 $db->commit();
                 
@@ -73,17 +52,24 @@ try {
         }
     }
     
-    // Получение статистики по языкам (только для активных пользователей)
+    // Получение статистики по пользователям
     $stats = $db->query("
         SELECT 
-            pl.id,
-            pl.name, 
-            COUNT(al.application_id) as user_count 
-        FROM programming_languages pl 
-        LEFT JOIN application_languages al ON pl.id = al.language_id 
-        LEFT JOIN users u ON al.application_id = u.application_id
-        GROUP BY pl.id, pl.name
-        ORDER BY user_count DESC, pl.name
+            COUNT(*) as total_users,
+            SUM(gender = 'male') as male_users,
+            SUM(gender = 'female') as female_users
+        FROM p_profiles
+    ")->fetch();
+    
+    // Получение статистики по языкам (обновленный запрос)
+    $languages_stats = $db->query("
+        SELECT 
+            pl.name as language_name,
+            COUNT(ul.user_id) as users_count
+        FROM programming_languages pl
+        LEFT JOIN p_user_languages ul ON pl.id = ul.language_id
+        GROUP BY pl.name
+        ORDER BY users_count DESC
     ")->fetchAll();
     
     // Получение всех пользователей с их данными
@@ -91,24 +77,29 @@ try {
         SELECT 
             u.id as user_id,
             u.login,
-            a.id as app_id,
-            a.fio,
-            a.tel,
-            a.email,
-            a.birth_date,
-            a.gender,
-            a.bio,
-            (
-                SELECT GROUP_CONCAT(pl.name SEPARATOR ', ')
-                FROM application_languages al
-                JOIN programming_languages pl ON al.language_id = pl.id
-                WHERE al.application_id = a.id
-                GROUP BY al.application_id
-            ) as languages
-        FROM users u
-        JOIN applications a ON u.application_id = a.id
-        ORDER BY a.id DESC
+            u.email,
+            p.full_name as fio,
+            p.phone as tel,
+            p.birth_date,
+            p.gender,
+            p.bio
+        FROM p_users u
+        LEFT JOIN p_profiles p ON u.id = p.user_id
+        ORDER BY u.id DESC
     ")->fetchAll();
+    
+    // Для каждого пользователя получаем его языки
+    foreach ($users as &$user) {
+        $stmt = $db->prepare("
+            SELECT pl.name 
+            FROM p_user_languages ul
+            JOIN programming_languages pl ON ul.language_id = pl.id
+            WHERE ul.user_id = ?
+        ");
+        $stmt->execute([$user['user_id']]);
+        $user['languages'] = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+    }
+    unset($user);
     
 } catch (PDOException $e) {
     die('Ошибка базы данных: ' . $e->getMessage());
@@ -188,14 +179,59 @@ try {
             align-items: center;
             margin-bottom: 20px;
         }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .stat-card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .language-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .language-stat {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>Панель администратора</h1>
-            <p>Вы вошли как: <strong><?= htmlspecialchars($_SERVER['PHP_AUTH_USER']) ?></strong></p>
+            <p>Вы вошли как: <strong><?= htmlspecialchars($_SESSION['login']) ?></strong> | <a href="logout.php">Выйти</a></p>
         </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Общая статистика</h3>
+                <p>Всего пользователей: <?= $stats['total_users'] ?></p>
+                <p>Мужчин: <?= $stats['male_users'] ?></p>
+                <p>Женщин: <?= $stats['female_users'] ?></p>
+            </div>
+            
+            <div class="stat-card">
+    <h3>Статистика по языкам</h3>
+    <div class="language-stats">
+        <?php foreach ($languages_stats as $lang): ?>
+            <div class="language-stat">
+                <?= htmlspecialchars($lang['language_name']) ?>: <?= $lang['users_count'] ?>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
         
         <h2>Все пользователи</h2>
         <table>
@@ -203,26 +239,29 @@ try {
                 <tr>
                     <th>ID</th>
                     <th>Логин</th>
+                    <th>Email</th>
                     <th>ФИО</th>
                     <th>Телефон</th>
-                    <th>Email</th>
                     <th>Дата рождения</th>
                     <th>Пол</th>
-                    <th>Языки программирования</th>
+                    <th>Языки</th>
                     <th>Действия</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($users as $user): ?>
+                <?php foreach ($users as $user): 
+                    $plang = json_decode($user['plang'] ?? '[]', true);
+                    $plang_display = is_array($plang) ? implode(', ', $plang) : '';
+                ?>
                 <tr>
                     <td><?= htmlspecialchars($user['user_id']) ?></td>
                     <td><?= htmlspecialchars($user['login']) ?></td>
-                    <td><?= htmlspecialchars($user['fio']) ?></td>
-                    <td><?= htmlspecialchars($user['tel']) ?></td>
-                    <td><?= htmlspecialchars($user['email']) ?></td>
-                    <td><?= htmlspecialchars($user['birth_date']) ?></td>
-                    <td><?= $user['gender'] == 'male' ? 'Мужской' : 'Женский' ?></td>
-                    <td><?= htmlspecialchars($user['languages'] ?? 'Нет данных') ?></td>
+                    <td><?= htmlspecialchars($user['email'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($user['fio'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($user['tel'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($user['birth_date'] ?? '') ?></td>
+                    <td><?= $user['gender'] == 'male' ? 'Мужской' : ($user['gender'] == 'female' ? 'Женский' : '') ?></td>
+                    <td><?= htmlspecialchars($plang_display) ?></td>
                     <td>
                         <a href="edit.php?id=<?= $user['user_id'] ?>" class="btn btn-edit">Редактировать</a>
                         <form method="POST" style="display:inline;">
@@ -237,26 +276,6 @@ try {
                 <?php endforeach; ?>
             </tbody>
         </table>
-        
-        <div class="stats">
-            <h2>Статистика по языкам программирования</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Язык программирования</th>
-                        <th>Количество пользователей</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($stats as $stat): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($stat['name']) ?></td>
-                        <td><?= htmlspecialchars($stat['user_count']) ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
     </div>
 </body>
 </html>
