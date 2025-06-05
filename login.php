@@ -1,21 +1,32 @@
+
 <?php
 session_start();
 
-// Проверяем, откуда пришел запрос (из формы пользователя или админа)
-$isAdminLogin = isset($_POST['admin_login']);
+// Включим отображение всех ошибок для отладки
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Определяем тип пользователя
+$is_admin = isset($_POST['admin_login']);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     try {
-        $db = new PDO("mysql:host=localhost;dbname=ваша_база", 'ваш_пользователь', 'ваш_пароль');
+        // Подключение к базе данных - ЗАМЕНИТЕ ЭТИ ДАННЫЕ НА СВОИ!
+        $db_host = 'localhost'; // обычно localhost
+        $db_name = 'u70422'; // замените на реальное имя вашей БД
+        $db_user = 'u70422'; // обычно root для локального сервера
+        $db_pass = '4545635'; // пароль для доступа к MySQL
+        
+        $db = new PDO("mysql:host=$db_host;dbname=$db_name", $db_user, $db_pass);
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        if ($isAdminLogin) {
-            // Проверка для администратора
-            $stmt = $db->prepare("SELECT * FROM admins WHERE login = ?");
+        if ($is_admin) {
+            // Запрос для администратора
+            $stmt = $db->prepare("SELECT id, login, password_hash FROM admins WHERE login = ?");
             $stmt->execute([$_POST['login']]);
             $user = $stmt->fetch();
             
-            if ($user && password_verify($_POST['pass'], $user['password'])) {
+            if ($user && password_verify($_POST['pass'], $user['password_hash'])) {
                 $_SESSION['admin'] = true;
                 $_SESSION['login'] = $user['login'];
                 $_SESSION['user_id'] = $user['id'];
@@ -23,12 +34,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 exit();
             }
         } else {
-            // Проверка для обычного пользователя
-            $stmt = $db->prepare("SELECT * FROM p_users WHERE login = ?");
+            // Запрос для обычного пользователя
+            $stmt = $db->prepare("SELECT id, login, password_hash FROM p_users WHERE login = ?");
             $stmt->execute([$_POST['login']]);
             $user = $stmt->fetch();
             
-            if ($user && password_verify($_POST['pass'], $user['password'])) {
+            if ($user && password_verify($_POST['pass'], $user['password_hash'])) {
                 $_SESSION['admin'] = false;
                 $_SESSION['login'] = $user['login'];
                 $_SESSION['user_id'] = $user['id'];
@@ -37,9 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
         
-        // Если не удалось авторизоваться
         $error = 'Неверный логин или пароль';
-        
     } catch (PDOException $e) {
         $error = 'Ошибка базы данных: ' . $e->getMessage();
     }
@@ -54,6 +63,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>Вход в систему</title>
     <link rel="stylesheet" href="css/main.css">
     <style>
+    .login-form input {
+        color: black !important;
+    }
+    .login-form input::placeholder {
+        color: #999 !important;
+    }
         .login-container {
             max-width: 400px;
             margin: 50px auto;
