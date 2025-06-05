@@ -1044,17 +1044,24 @@
                 <input class="input" type="tel" name="tel" placeholder="Телефон" required>
                 <input class="input" type="email" name="email" placeholder="E-mail" required>
                 <input class="input" type="date" name="date" required>
-
-                <div class="gender-options" style="display: flex; gap: 15px; margin-bottom: 15px;">
-                    <label style="display: flex; align-items: center;">
-                        <input type="radio" name="gender" value="male" required> Мужской
-                    </label>
-                    <label style="display: flex; align-items: center;">
-                        <input type="radio" name="gender" value="female"> Женский
-                    </label>
-                </div>
+<div class="gender-options" style="display: flex; gap: 15px; margin-bottom: 15px; color: white;">
+    <label style="display: flex; align-items: center;">
+        <input type="radio" name="gender" value="male" required> Мужской
+    </label>
+    <label style="display: flex; align-items: center;">
+        <input type="radio" name="gender" value="female"> Женский
+    </label>
+</div>
 
                 <select class="input" name="plang[]" multiple required style="height: 120px;">
+
+    <?php
+    $db = new PDO("mysql:host=localhost;dbname=u70422", 'u70422', '4545635');
+    $languages = $db->query("SELECT * FROM programming_languages")->fetchAll();
+    foreach ($languages as $lang): ?>
+        <option value="<?= $lang['id'] ?>"><?= htmlspecialchars($lang['name']) ?></option>
+    <?php endforeach; ?>
+
                     <option value="Pascal">Pascal</option>
                     <option value="C">C</option>
                     <option value="C++">C++</option>
@@ -1076,8 +1083,7 @@
                 <button class="footer__btn btn__reset" type="submit">ЗАРЕГИСТРИРОВАТЬСЯ</button>
 
                 <div class="form-links" style="margin-top: 20px; text-align: center;">
-                    <a href="login.php" style="color: #f14d34; margin-right: 15px;">Вход для пользователей</a>
-                    <a href="admin.php" style="color: #f14d34;">Вход для администратора</a>
+<a href="login.php" style="color: #f14d34;">Вход в систему</a>
                 </div>
             </form>
         </div>
@@ -1087,16 +1093,54 @@
 </body>
 
 <script>
-    document.getElementById('registrationForm').addEventListener('submit', async function (e) {
-        e.preventDefault(); const form = e.target; const formData = new FormData(form); try {
-            const response = await fetch(form.action, { method: 'POST', body: formData });
-            const result = await response.json(); if (result.success) {
-                alert(`Регистрация успешна!\nЛогин: ${result.login}\nПароль: ${result.password}`);
-            } else {
-                alert(result.message || 'Ошибка при регистрации');
-            }
-        } catch (error) { console.error('Ошибка:', error); alert('Ошибка при отправке формы'); }
+    document.getElementById('registrationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Создаем модальное окно с данными
+            const modal = document.createElement('div');
+            modal.style.position = 'fixed';
+            modal.style.top = '0';
+            modal.style.left = '0';
+            modal.style.width = '100%';
+            modal.style.height = '100%';
+            modal.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            modal.style.display = 'flex';
+            modal.style.justifyContent = 'center';
+            modal.style.alignItems = 'center';
+            modal.style.zIndex = '1000';
+
+            modal.innerHTML = `
+                <div style="background: white; padding: 20px; border-radius: 5px; max-width: 500px;">
+                    <h2>Регистрация успешна!</h2>
+                    <p>Логин: <span id="login">${data.login}</span></p>
+                    <p>Пароль: <span id="password">${data.password}</span></p>
+                    <p>Сохраните эти данные для входа в систему</p>
+                    <button onclick="this.parentNode.parentNode.remove(); window.location.href='login.php'" 
+                            style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        Перейти к странице входа
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        } else {
+            alert('Ошибка: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        alert('Ошибка при отправке формы');
     });
+});
 </script>
 
 <script>
